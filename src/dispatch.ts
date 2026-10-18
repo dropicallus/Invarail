@@ -1822,6 +1822,18 @@ async function runAsBareChat(
     : h,
   );
 
+  // CAPABILITY TRUTH (2026-10-18). A tool-less category used to say NOTHING about tools, so a
+  // model with no ground truth invented a set when asked (it listed read_file/write_file/
+  // delete_file/memory_save/memory_search — `delete_file` does not exist in this harness at all).
+  // Say the real situation instead of letting it guess.
+  systemContent += '\n\n## Your capabilities on this message\n'
+    + 'You run WITHOUT tools right now (this category is tool-less). You can only reply in text: '
+    + 'no shell, no file reads or writes, no web access, no memory writes.\n'
+    + '- If asked which tools you have, answer that exactly and name none.\n'
+    + '- If a request needs an action, say it must be phrased as an action (run ..., read the file ..., '
+    + 'search the web for ...) so it reaches a category that has tools.\n'
+    + '- NEVER invent tool names, NEVER print a tool list, NEVER claim you performed an action.';
+
   const messages: OllamaMessage[] = [
     { role: 'system', content: systemContent },
     ...cleanHistory,

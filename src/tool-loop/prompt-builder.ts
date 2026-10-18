@@ -67,6 +67,19 @@ export function buildReActSystemPrompt(
   // including all conversation history. They now ride the volatile tail instead
   // (buildVolatileContext), which also puts them in the recency position.
 
+  // ── Tools — NAME them, in both styles. The API's tools field alone is not enough for a
+  // small 1-bit model: asked "which tools do you have now?" it answered "none / I have no
+  // tools" while holding four working tools, and before that it invented a list
+  // (read_file/write_file/delete_file/memory_save/memory_search — delete_file does not
+  // exist here). The list comes from the specialist config, so it is byte-identical for
+  // every turn of a category — the prefix-cache contract above is unaffected.
+  if (tools.length > 0) {
+    sections.push(`## Tools you have on THIS turn
+Exactly these ${tools.length}: ${tools.map(t => t.name).join(', ')}.
+- Asked which tools you have: list exactly these names. Claiming you have no tools is FALSE while this line is present.
+- Do not describe tools that are not on this list, and never claim an action you did not perform with one of them.`);
+  }
+
   // ── Tools — text style only. In native style the tool schemas travel via the
   // API tools field and the model's own template; duplicating them here doubles
   // the prompt AND teaches a second, contradictory calling convention.
@@ -81,6 +94,19 @@ export function buildReActSystemPrompt(
       toolLines.push('');
     }
     sections.push(toolLines.join('\n'));
+  }
+
+  // ── Tool-less turn: say it out loud. Without this section the model has no ground truth
+  // about its own capabilities and invents a plausible toolset when asked (observed
+  // 2026-10-18 in the bare-chat path: it listed read_file/write_file/delete_file/memory_save/
+  // memory_search — four tools it did not have and one that does not exist in this harness).
+  if (tools.length === 0) {
+    sections.push(`## Tools
+
+You have NO tools on this turn — this category runs without any. You cannot run commands, read or write files, search the web, or change state.
+- Asked what tools you have: answer exactly that (none in this category), never a list.
+- A request that needs an action must be phrased as an action ("run …", "read the file …", "search the web for …") so the router sends it to a category that has tools.
+- NEVER invent tool names and NEVER claim you performed an action.`);
   }
 
   // ── Persona (workspace context) — compressed, middle position ──
